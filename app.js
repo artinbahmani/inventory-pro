@@ -302,7 +302,7 @@
 
   function openModal(id) {
     const dlg = $(id);
-    if (typeof dlg.showModal === "function") dlg.showModal();
+    if (!dlg.open && typeof dlg.showModal === "function") dlg.showModal();
   }
   function closeModal(dlg) { dlg.close(); }
 
@@ -627,6 +627,14 @@
     $$("[data-close]").forEach(function (btn) {
       btn.addEventListener("click", function () { closeModal(btn.closest("dialog")); });
     });
+
+    // Clicking the dimmed backdrop (i.e. the dialog element itself, not the
+    // form inside it) dismisses the dialog, as the overlay styling implies.
+    $$("dialog.modal").forEach(function (dlg) {
+      dlg.addEventListener("click", function (e) {
+        if (e.target === dlg) closeModal(dlg);
+      });
+    });
   }
 
   function bindKeyboard() {
@@ -637,6 +645,9 @@
         return;
       }
       if (inField) return;
+      // Global shortcuts stay inert while a modal is open — otherwise they
+      // would stack a second dialog on top of the visible one.
+      if (document.querySelector("dialog[open]")) return;
       if (e.key === "/") {
         e.preventDefault();
         $("#search").focus();
