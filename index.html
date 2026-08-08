@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>inventory-pro — Inventory &amp; Stock Management</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="app-header">
+  <div class="brand">
+    <span class="brand-mark">▦</span>
+    <div>
+      <h1>inventory-pro</h1>
+      <p class="tagline">Inventory &amp; stock management</p>
+    </div>
+  </div>
+  <div class="header-actions">
+    <button id="btnExportProducts" class="btn ghost" title="Download products as CSV">CSV Products</button>
+    <button id="btnExportMovements" class="btn ghost" title="Download movements as CSV">CSV Movements</button>
+    <button id="btnBackup" class="btn ghost" title="Download full JSON backup">Backup</button>
+    <button id="btnRestore" class="btn ghost" title="Restore from a JSON backup file">Restore</button>
+    <input type="file" id="restoreFile" accept="application/json,.json" hidden>
+  </div>
+</header>
+
+<!-- Valuation strip -->
+<section class="valuation" id="valuation">
+  <div class="val-card">
+    <span class="val-label">Stock value (cost)</span>
+    <span class="val-number" id="valCost">—</span>
+  </div>
+  <div class="val-card">
+    <span class="val-label">Potential sale value</span>
+    <span class="val-number" id="valSale">—</span>
+  </div>
+  <div class="val-card">
+    <span class="val-label">Potential margin</span>
+    <span class="val-number" id="valMargin">—</span>
+  </div>
+  <div class="val-card warn" id="lowStockCard" title="Products at or below reorder level">
+    <span class="val-label">Low-stock alerts</span>
+    <span class="val-number" id="valAlerts">0</span>
+  </div>
+</section>
+
+<nav class="tabs">
+  <button class="tab active" data-tab="products">Products</button>
+  <button class="tab" data-tab="movements">Movements</button>
+  <button class="tab" data-tab="suppliers">Suppliers</button>
+</nav>
+
+<main>
+  <!-- ============ PRODUCTS TAB ============ -->
+  <section id="tab-products" class="tab-pane active">
+    <div class="dash-row">
+      <!-- Stock health donut -->
+      <div class="panel donut-panel">
+        <h2>Stock health</h2>
+        <div class="donut-wrap">
+          <svg id="donut" viewBox="0 0 120 120" width="140" height="140" role="img" aria-label="Stock health chart"></svg>
+          <div class="donut-legend" id="donutLegend"></div>
+        </div>
+      </div>
+      <!-- Top movers -->
+      <div class="panel movers-panel">
+        <h2>Top movers <span class="hint">(last 30 days, by units moved)</span></h2>
+        <ol id="topMovers" class="movers-list"></ol>
+      </div>
+      <!-- Low stock alerts -->
+      <div class="panel alerts-panel">
+        <h2>Low-stock alerts</h2>
+        <ul id="lowStockList" class="alerts-list"></ul>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <div class="search-wrap">
+        <input type="search" id="search" class="barcode-input" placeholder="⌗ scan / type SKU or name — instant filter"
+               autocomplete="off" spellcheck="false">
+        <kbd>Enter</kbd><span class="hint">jump to first match</span>
+      </div>
+      <div class="chips" id="categoryChips"></div>
+      <button id="btnAddProduct" class="btn primary">+ Product</button>
+      <button id="btnAddMovement" class="btn accent">± Stock movement</button>
+    </div>
+
+    <div class="table-wrap">
+      <table id="productsTable">
+        <thead>
+          <tr>
+            <th data-sort="sku">SKU</th>
+            <th data-sort="name">Name</th>
+            <th data-sort="category">Category</th>
+            <th data-sort="supplier">Supplier</th>
+            <th data-sort="cost" class="num">Cost</th>
+            <th data-sort="price" class="num">Sale</th>
+            <th data-sort="stock" class="num">Stock</th>
+            <th data-sort="reorder" class="num">Reorder</th>
+            <th data-sort="margin" class="num">Margin %</th>
+            <th class="actions-col">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="productsBody"></tbody>
+      </table>
+      <p id="productsEmpty" class="empty" hidden>No products match the current filter.</p>
+    </div>
+  </section>
+
+  <!-- ============ MOVEMENTS TAB ============ -->
+  <section id="tab-movements" class="tab-pane">
+    <div class="toolbar">
+      <div class="search-wrap">
+        <input type="search" id="movementSearch" class="barcode-input" placeholder="Filter by SKU, product or reason…"
+               autocomplete="off" spellcheck="false">
+      </div>
+      <div class="chips" id="movementTypeChips">
+        <button class="chip active" data-type="all">All</button>
+        <button class="chip" data-type="in">In</button>
+        <button class="chip" data-type="out">Out</button>
+        <button class="chip" data-type="adjust">Adjust</button>
+      </div>
+      <button id="btnAddMovement2" class="btn accent">± Stock movement</button>
+    </div>
+    <div class="table-wrap">
+      <table id="movementsTable">
+        <thead>
+          <tr>
+            <th data-msort="date">Date</th>
+            <th data-msort="sku">SKU</th>
+            <th data-msort="product">Product</th>
+            <th data-msort="type">Type</th>
+            <th data-msort="qty" class="num">Qty</th>
+            <th data-msort="reason">Reason</th>
+            <th class="num">Stock after</th>
+          </tr>
+        </thead>
+        <tbody id="movementsBody"></tbody>
+      </table>
+      <p id="movementsEmpty" class="empty" hidden>No movements recorded yet.</p>
+    </div>
+  </section>
+
+  <!-- ============ SUPPLIERS TAB ============ -->
+  <section id="tab-suppliers" class="tab-pane">
+    <div class="toolbar">
+      <div class="search-wrap">
+        <input type="search" id="supplierSearch" class="barcode-input" placeholder="Filter suppliers…"
+               autocomplete="off" spellcheck="false">
+      </div>
+      <button id="btnAddSupplier" class="btn primary">+ Supplier</button>
+    </div>
+    <div class="table-wrap">
+      <table id="suppliersTable">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Contact</th>
+            <th>Email</th>
+            <th>Phone</th>
+            <th class="num">Products</th>
+            <th class="actions-col">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="suppliersBody"></tbody>
+      </table>
+      <p id="suppliersEmpty" class="empty" hidden>No suppliers yet.</p>
+    </div>
+  </section>
+</main>
+
+<footer class="app-footer">
+  <span>Keyboard: <kbd>/</kbd> focus search · <kbd>Esc</kbd> clear/close · <kbd>n</kbd> new product · <kbd>m</kbd> new movement</span>
+  <span>Data persists in localStorage · JSON backup/restore supported</span>
+</footer>
+
+<!-- ============ PRODUCT MODAL ============ -->
+<dialog id="productModal" class="modal">
+  <form method="dialog" id="productForm">
+    <h2 id="productModalTitle">Add product</h2>
+    <div class="form-grid">
+      <label>SKU<input name="sku" required maxlength="24" placeholder="e.g. WB-1001"></label>
+      <label>Name<input name="name" required maxlength="80" placeholder="Product name"></label>
+      <label>Category<input name="category" required list="categoryList" maxlength="40" placeholder="e.g. Audio">
+        <datalist id="categoryList"></datalist></label>
+      <label>Supplier<select name="supplier" id="productSupplierSelect"></select></label>
+      <label>Cost price<input name="cost" type="number" min="0" step="0.01" required></label>
+      <label>Sale price<input name="price" type="number" min="0" step="0.01" required></label>
+      <label>Stock on hand<input name="stock" type="number" min="0" step="1" required></label>
+      <label>Reorder level<input name="reorder" type="number" min="0" step="1" required></label>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" data-close>Cancel</button>
+      <button type="submit" class="btn primary">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ============ MOVEMENT MODAL ============ -->
+<dialog id="movementModal" class="modal">
+  <form method="dialog" id="movementForm">
+    <h2>Record stock movement</h2>
+    <div class="form-grid">
+      <label>Product<select name="productId" id="movementProductSelect" required></select></label>
+      <label>Type
+        <select name="type" required>
+          <option value="in">In (receive stock)</option>
+          <option value="out">Out (sale / issue)</option>
+          <option value="adjust">Adjust (set exact count)</option>
+        </select></label>
+      <label id="qtyLabel">Quantity<input name="qty" type="number" min="1" step="1" required></label>
+      <label>Reason<input name="reason" maxlength="80" placeholder="e.g. Purchase order #1042"></label>
+      <label>Date<input name="date" type="datetime-local"></label>
+    </div>
+    <p class="hint" id="movementPreview"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" data-close>Cancel</button>
+      <button type="submit" class="btn accent">Record</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ============ SUPPLIER MODAL ============ -->
+<dialog id="supplierModal" class="modal">
+  <form method="dialog" id="supplierForm">
+    <h2 id="supplierModalTitle">Add supplier</h2>
+    <div class="form-grid">
+      <label>Name<input name="name" required maxlength="60"></label>
+      <label>Contact person<input name="contact" maxlength="60"></label>
+      <label>Email<input name="email" type="email" maxlength="80"></label>
+      <label>Phone<input name="phone" maxlength="30"></label>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" data-close>Cancel</button>
+      <button type="submit" class="btn primary">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script src="store.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
